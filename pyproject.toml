@@ -1,0 +1,45 @@
+[project]
+name = "truffle-sdk"
+version = "0.6.0"
+description = "Typeshed information and CLI for the SDK"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "grpcio>=1.69.0",
+    "grpcio-reflection>=1.69.0",
+    "protobuf>=5.29.3",
+    "python-dotenv>=1.0.1",
+    "requests>=2.32.3",
+    "tomli>=2.2.1",
+    "tomli-w>=1.2.0",
+    "typer>=0.15.1",
+]
+
+[project.scripts]
+truffle = "truffle:truffle_cli.cli"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = [
+    "-ra",
+    "-q",
+    "--strict-markers",
+    "--strict-config",
+    "--doctest-modules",
+]
+testpaths = [
+    "tests",
+]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test", "Acceptance"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks tests as integration tests",
+]
+
+[dependency-groups]
+testing = [
+    "openai>=1.59.9",
+]
+dev = []

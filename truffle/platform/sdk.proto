@@ -1,0 +1,182 @@
+syntax = "proto3";
+package sdk;
+
+
+
+
+
+message ModelDescription{
+    int32 model_id = 1;
+    string name = 2;
+    string description = 3;
+    enum ModelType{
+        MODEL_UNSPECIFIED = 0;
+        MODEL_SMART = 1;
+        MODEL_FAST = 2;
+        MODEL_VISION = 3;
+        MODEL_AGI = 4;
+    }
+    message Capabilities{
+        bool structured_output = 1;
+        bool image_support = 2;
+        bool reasoner = 3;
+        bool world_domination = 4; 
+        repeated string languages = 5;
+    }
+    Capabilities capabilities = 4;
+    ModelType type = 5; 
+    bool is_local = 6;
+}
+message GetModelsRequest{}
+
+message GetModelsResponse{
+    repeated ModelDescription models = 1;
+}
+
+
+
+service TruffleSDK{
+    rpc Infer(GenerateRequest) returns (stream TokenResponse);
+    rpc InferSync(GenerateRequest) returns (GenerateResponse);
+    rpc GetModels(GetModelsRequest) returns (GetModelsResponse);
+
+    rpc Embed(EmbedRequest) returns (EmbedResponse);
+
+    rpc AskUser(UserRequest) returns (UserResponse);
+
+    rpc ToolUpdate(ToolUpdateRequest) returns (SDKResponse);
+
+
+    rpc SystemTool(SystemToolRequest) returns (SystemToolResponse);
+}
+
+
+message SystemToolRequest{
+    string tool_name = 1; //ie. perplexity search
+    map<string, string> args = 2; 
+}
+
+message SystemToolResponse{
+    string response = 1;
+    map<string, string> results = 2;
+    optional string error = 3;
+}
+
+
+message SDKResponse{
+    bool ok = 1;
+    optional string error = 2;
+}
+message ToolUpdateRequest{
+    string friendly_description = 1;
+}
+
+
+message UserRequest{
+    string message = 1;
+    string reason = 2;
+}
+
+message UserResponse {
+    string response = 1;
+    optional string error = 2;
+    repeated string attached_files = 3; //paths to where in the container any uploads went (size=0 if none)
+}
+
+
+
+
+//Inference api stuff
+
+message GenerateResponseFormat{
+    enum ResponseFormat{
+        RESPONSE_TEXT = 0;
+        RESPONSE_JSON = 1;
+    };
+    ResponseFormat format = 1;
+    optional string schema = 2; //if json and not defined the model just outputs in valid json, no structure 
+}
+message Content {
+    enum Role {
+        ROLE_INVALID = 0;
+        ROLE_USER = 1;
+        ROLE_AI = 2;
+        ROLE_SYSTEM = 3;
+    }
+    Role role = 1;
+    string content = 2;
+    optional bytes data = 3; //unused for now - b64 image for example 
+}; 
+
+message Context {
+    repeated Content history = 1;
+}
+message GenerateRequest {
+    oneof content {
+        string message = 1;
+        Context context = 2;
+    }
+
+    int32 max_tokens = 3;
+    int32 model_id = 4;
+    optional float temperature = 5;
+    optional GenerateResponseFormat fmt = 6;
+}
+
+message GenerationUsage{
+    int32 prompt_tokens = 1;
+    int32 completion_tokens = 2;
+    int32 approx_time = 3;
+}
+
+enum GenerateFinishReason {
+    FINISH_REASON_UNSPECIFIED = 0;
+    FINISH_REASON_LENGTH = 1;
+    FINISH_REASON_STOP = 2;
+    FINISH_REASON_ERROR = 3;
+    FINISH_REASON_USER = 4;
+}
+
+message TokenResponse {
+    string token = 1;
+    optional GenerateFinishReason finish_reason = 2;
+    optional GenerationUsage usage = 3;
+    optional string error = 4;
+}
+
+message GenerateResponse{
+    string response = 1;
+    optional GenerateFinishReason finish_reason = 2;
+    optional GenerationUsage usage = 3;
+    optional string error = 4;
+}
+
+
+
+// Embedding api stuff
+
+message SortedEmbedding{
+    string text = 1;
+    float score = 2;
+};
+message EmbedResponse{
+    repeated SortedEmbedding results = 1; //from most to least 
+}
+message EmbedRequest{
+    repeated string documents = 1; 
+    string query = 2; 
+}
+
+
+
+
+
+// Truffle types 
+// add attr to metadata like __truffle_return__ "TRUFFLE_IMAGE" (stringify enum)
+
+
+enum TruffleType{
+    TRUFFLE_UNSPECIFIED = 0;
+    TRUFFLE_IMAGE = 1;
+    TRUFFLE_FILE = 2;
+}

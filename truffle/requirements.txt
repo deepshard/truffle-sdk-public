@@ -1,0 +1,16 @@
+certifi==2024.12.14
+charset-normalizer==3.4.1
+click==8.1.8
+grpcio==1.69.0
+grpcio-reflection==1.69.0
+idna==3.10
+markdown-it-py==3.0.0
+mdurl==0.1.2
+protobuf==5.29.3
+pygments==2.19.1
+requests==2.32.3
+rich==13.9.4
+shellingham==1.5.4
+typer==0.15.1
+typing-extensions==4.12.2
+urllib3==2.3.0

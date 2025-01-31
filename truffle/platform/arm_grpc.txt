@@ -1,0 +1,11 @@
+notes
+for arm alpine:
+grpcio==1.62.1
+grpcio-reflection==1.62.1
+protobuf==4.24.4
+
+
+to build for old version:
+
+pip3 install grpcio==1.62.1 grpcio-tools==1.62.1
+python -m grpc_tools.protoc -I. --python_out=. --pyi_out=. --grpc_python_out=. sdk.proto
