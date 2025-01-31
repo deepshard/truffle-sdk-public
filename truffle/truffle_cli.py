@@ -20,7 +20,7 @@ from requests.models import Response
 from typing_extensions import Annotated
 from urllib3.exceptions import InsecureRequestWarning
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 log = logging.getLogger(__name__)
 

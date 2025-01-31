@@ -9,7 +9,7 @@ from .client import TruffleClient, TruffleReturnType, TruffleFile  # noqa: F401
 
 __all__ = ["TruffleApp", "TruffleClient", "AppMetadata", "TruffleFile"]
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 APP_SOCK = (
     os.getenv("TRUFFLE_APP_SOCKET")
     if os.getenv("TRUFFLE_APP_SOCKET") is not None
