@@ -4,6 +4,7 @@ import ast
 import getpass
 import json
 import logging
+import os
 import re
 import sys
 import zipfile
@@ -100,23 +101,14 @@ def _validate_requirements_txt(requirements_file: Path) -> bool:
         # Filter out comments and empty lines
         package_lines = [line for line in lines if line and not line.startswith("#")]
 
-        # Look for truffle package
-        truffle_lines = [line for line in package_lines if line.startswith("truffle")]
+        # remove truffle from deps
+        truffle_free_lines = [
+            line for line in package_lines if not line.startswith("truffle")
+        ]
 
-        if not truffle_lines:
-            log.error("truffle package not found in requirements.txt")
-            return False
-
-        # Check if any truffle line has version constraints
-        # Common patterns: ==, >=, <=, !=, ~=, >,
-        version_pattern = r"truffle\s*(?:[><=!~]=|[><])\s*[\d\.]+"
-
-        for line in truffle_lines:
-            if re.match(version_pattern, line):
-                return True
-
-        log.error("truffle SDK version not specified")
-        return False
+        os.remove(requirements_file)
+        requirements_file.write_text("\n".join(truffle_free_lines))
+        return True
 
     except (FileNotFoundError, PermissionError):
         log.error("requirements.txt encountered an error", exc_info=True)
