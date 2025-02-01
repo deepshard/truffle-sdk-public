@@ -1,8 +1,6 @@
-import functools
 import inspect
 import logging
 import os
-import traceback
 import typing
 from concurrent import futures
 from dataclasses import dataclass
@@ -16,11 +14,9 @@ from google.protobuf.descriptor import (
     FieldDescriptor,
     MethodDescriptor,
 )
-from google.protobuf.json_format import MessageToDict
 from grpc_reflection.v1alpha import reflection
 
-from .client import TruffleReturnType, TruffleFile, TruffleImage
-from . import toproto
+# from .client import TruffleReturnType, TruffleFile, TruffleImage
 
 APP_SOCK = (
     os.getenv("TRUFFLE_APP_SOCKET")
@@ -133,6 +129,10 @@ class ToolMethod:
     wrapper: typing.Callable = None
 
 
+def debug_stub(*args):
+    log.debug("reached internal SDK codepath")
+
+
 def create_tool_method(func, class_obj) -> ToolMethod:
     """
     Generate the type information typically extracted from the .proto file for a service method.
@@ -140,11 +140,11 @@ def create_tool_method(func, class_obj) -> ToolMethod:
     pool = descriptor_pool.Default()
     method = ToolMethod(func=func)
 
-    method.input_type, method.output_type = toproto.func_to_proto(
+    method.input_type, method.output_type = debug_stub(
         func, package=class_obj.__class__.__name__, descriptor_pool=pool
     )
-    method.input_class = toproto.descriptor_to_message_class(method.input_type)
-    method.output_class = toproto.descriptor_to_message_class(method.output_type)
+    method.input_class = debug_stub(method.input_type)
+    method.output_class = debug_stub(method.output_type)
 
     return method
 
@@ -158,184 +158,11 @@ class TruffleApp:
         self.metadata: AppMetadata = class_obj.metadata
         self.instance_of_class = class_obj
         self.tool_funcs = {}
-        # find the methods marked for agentic use and store them
-        for name, func in get_function_members(class_obj).items():
-            if hasattr(func, "__truffle_tool__"):
-                # Perhaps we instead yell at someone if they don't pass self instead
-                if hasattr(func, "__self__"):
-                    self.tool_funcs[name] = func.__func__
-                else:
-                    self.tool_funcs[name] = func
-
-        # add get metadata tool
         self.tool_funcs["TruffleAppMetadata"] = get_get_metadata(self.metadata)
-        # NOTE: What follows is my best explanation of how we approach
-        # generating fully-fledged gRPC services starting from nothing but a
-        # python function object in memory. You have been warned!!!
 
-        ########## Part 1: Generate the contents which usually comes from the Service Descriptor ################
-        # In order for the gRPC service to be discovered at runtime, it needs to also provide a Service Descriptor.
-        # Instead of going the "blessed" route of having a proto and handing them off to a compiler, we hack up
-        # what the compiler what generate from the type information instead.
-        methods_without_wrappers = {}
-        for name, func in self.tool_funcs.items():
-            method_with_descriptor = create_tool_method(func, class_obj)
-            methods_without_wrappers[name] = method_with_descriptor
-        ########## Part 2: Create the service which offers those methods ################
-        # In gRPC jargon, the service is the collection of methods and descriptors which
-        # gets registered to the actual server software. Y'know the thing listening for
-        # traffic on the socket?
-        self._service = toproto.methods_to_service(
-            funcs=[
-                (method.func, method.input_type, method.output_type)
-                for method in methods_without_wrappers.values()
-            ],
-            package=class_obj.__class__.__name__,
-            descriptor_pool=descriptor_pool.Default(),
-        )
+        self._service = None
 
-        ########## Part 3: build the request handlers which wrap each method ################
-        # We must also fullfill Google's fetish for context objects in order to actually
-        # service the requests, so since we left the protobuf compiler on the curb, here we
-        # go!!!
-
-        def _request_handler(
-            method, class_instance, request, context: grpc.ServicerContext
-        ):
-            """
-            This is what actually gets called by the GRPC server to execute
-            your app's method.
-            """
-
-            for metadatum in context.invocation_metadata():
-                if metadatum.key == "get_desc":
-                    # add metadata to response and send back empty PB
-                    metadata = (
-                        (
-                            "truffle_tool_desc",
-                            method.func.__truffle_description__,
-                        ),
-                    )
-                    if (
-                        hasattr(method.func, "__truffle_type__")
-                        and method.func.__truffle_type__
-                    ):
-                        metadata += (
-                            ("truffle_return_type", method.func.__truffle_type__),
-                        )
-                        print("desc", method.func.__truffle_description__)
-                        print("type", method.func.__truffle_type__)
-                    if method.func.__truffle_icon__:
-                        metadata += (
-                            ("truffle_tool_icon", method.func.__truffle_icon__),
-                        )
-                    if method.func.__truffle_args__:
-                        for (
-                            var_name,
-                            var_desc,
-                        ) in method.func.__truffle_args__.items():
-                            metadata += ((var_name, var_desc),)
-                    context.set_trailing_metadata(metadata)
-                    return method.output_class()
-
-            # Convert protobuf message to disctionary, actually *call* the function here.
-            # this should be self rolled it causes a lot of issues and is fairly trivial
-            args_dict = None
-            try:
-                args_dict = MessageToDict(
-                    request,
-                    always_print_fields_with_no_presence=True,
-                    preserving_proto_field_name=True,
-                    descriptor_pool=descriptor_pool.Default(),
-                )
-            except Exception as e:
-                print("Using deprecated MessageToDict")
-                args_dict = MessageToDict(
-                    request,
-                    preserving_proto_field_name=True,
-                    descriptor_pool=descriptor_pool.Default(),
-                )
-
-            for field in method.input_class.DESCRIPTOR.fields:
-                if field.name in args_dict:
-                    if is_numeric_field(field):
-                        if is_float_field(field):
-                            args_dict[field.name] = float(args_dict[field.name])
-                        else:
-                            args_dict[field.name] = int(args_dict[field.name])
-            args = list(args_dict.values())
-
-            # now we populate an instance of the output protobuf object with the results
-            # of calling the original method from the app
-            ret_pb = method.output_class()
-            try:
-                ret_val = method.func(class_instance, *args)
-                for field in ret_pb.DESCRIPTOR.fields:
-                    if field.name == "return_value":
-                        field_type = field.type
-                        is_map = (
-                            field.message_type
-                            and field.message_type.has_options
-                            and field.message_type.GetOptions().map_entry
-                        )
-
-                        if is_map:
-                            # Handle map fields
-                            if isinstance(ret_val, dict):
-                                map_field = getattr(ret_pb, field.name)
-                                log.info(
-                                    f"setting map field {field.name}->{map_field} to {ret_val}"
-                                )
-                                # might need to recursively stringify the keys or someshit
-                                map_field.update(ret_val)
-                        elif (
-                            field.label == FieldDescriptor.LABEL_REPEATED
-                        ):  # and field_type is not FieldDescriptor.TYPE_MESSAGE:
-                            # Handle repeated fields
-                            if isinstance(ret_val, (list, tuple)):
-                                getattr(ret_pb, field.name).extend(ret_val)
-                            else:
-                                getattr(ret_pb, field.name).append(ret_val)
-                        else:
-                            # Handle single value fields
-                            if field_type == FieldDescriptor.TYPE_MESSAGE:
-                                # For nested message types
-                                log.info("nested message type: ", field.message_type)
-
-                                if isinstance(ret_val, dict):
-                                    getattr(ret_pb, field.name).ParseFromDict(ret_val)
-                                else:
-                                    nested = getattr(ret_pb, field.name)
-
-                                    log.info("nested: ", type(nested))
-                                    nested = ret_val
-                            else:
-                                # For primitive types
-                                log.info(f"setting {field.name} to {ret_val}")
-                                setattr(ret_pb, field.name, ret_val)
-            except Exception as e:
-                error_str = f"Tool Call Error!\n Error: f{e}\n Traceback: {traceback.format_exc()}"
-                log.info("error: ", e)
-                context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details("Error running tool: \n" + error_str)
-                return ret_pb
-            context.set_code(grpc.StatusCode.OK)
-            context.set_details("Tool ran successfully")
-            return ret_pb
-
-        ########## Part 4: Build the fully baked gRPC service method objects
         self.grpc_service_methods = {}
-        for (
-            method_name,
-            method_without_wrapper,
-        ) in methods_without_wrappers.items():
-            fully_baked_grpc_method = method_without_wrapper
-            fully_baked_grpc_method.wrapper = functools.partial(
-                _request_handler,
-                method_without_wrapper,
-                class_obj,
-            )
-            self.grpc_service_methods[method_name] = fully_baked_grpc_method
 
     def launch(self, socket_path: str = APP_SOCK):
         """
