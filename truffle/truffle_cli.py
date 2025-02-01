@@ -21,7 +21,7 @@ from requests.models import Response
 from typing_extensions import Annotated
 from urllib3.exceptions import InsecureRequestWarning
 
-__version__ = "0.6.2"
+__version__ = "0.6.3"
 
 log = logging.getLogger(__name__)
 
