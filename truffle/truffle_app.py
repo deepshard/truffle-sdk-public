@@ -15,7 +15,7 @@ from google.protobuf.descriptor import (
     MethodDescriptor,
 )
 from grpc_reflection.v1alpha import reflection
-
+from google.protobuf.service import Service
 # from .client import TruffleReturnType, TruffleFile, TruffleImage
 
 APP_SOCK = (
@@ -160,8 +160,6 @@ class TruffleApp:
         self.tool_funcs = {}
         self.tool_funcs["TruffleAppMetadata"] = get_get_metadata(self.metadata)
 
-        self._service = None
-
         self.grpc_service_methods = {}
 
     def launch(self, socket_path: str = APP_SOCK):
@@ -169,7 +167,7 @@ class TruffleApp:
         Spin up a gRPC server, register our generated service and launch the server.
         """
 
-        class AppService(self._service.service_class):
+        class AppService(object):
             def __init__(self, tool_methods, desc):
                 """Yet Another wrapper which appears to exist to make the RPC server happy."""
                 super().__init__()
