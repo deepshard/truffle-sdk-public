@@ -21,7 +21,7 @@ from requests.models import Response
 from typing_extensions import Annotated
 from urllib3.exceptions import InsecureRequestWarning
 
-__version__ = "0.6.4"
+__version__ = "0.6.5"
 
 log = logging.getLogger(__name__)
 
@@ -436,8 +436,7 @@ def upload(
         if response.status_code == 200:
             print(f"Upload of {zip_path.name} successful!")
             print(f"Check your client for the status")
-            os.system("open 'truffle://focus'")
-
+           
     except FileNotFoundError:
         print(f"Error: Could not find file {zip_path}")
     except requests.exceptions.RequestException as e:
