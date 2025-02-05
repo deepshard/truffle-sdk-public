@@ -15,7 +15,7 @@ from google.protobuf.descriptor import (
     MethodDescriptor,
 )
 from grpc_reflection.v1alpha import reflection
-from google.protobuf.service import Service
+
 # from .client import TruffleReturnType, TruffleFile, TruffleImage
 
 APP_SOCK = (
@@ -38,7 +38,7 @@ class AppMetadata:
     # User Facing information
     name: str  # user friendly name ex. "My Cool App"
     description: str  # what does your app do? ex. "My Cool App is a tool that helps you write haikus"
-    icon: str  # the icon for your app
+    icon: str = "icon.png"  # the icon for your app
 
     def __post_init__(self):
         if not self.validate():

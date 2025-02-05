@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 
 cli = typer.Typer()
 
+TRUFFLE_CLOUD_URL = "https://overcast.itsalltruffles.com:2087"
 
 class MethodVisitor(ast.NodeVisitor):
     """AST visitor that finds methods decorated with 'expose.tool'"""
@@ -136,24 +137,25 @@ def _assemble_zip(dir_path: Path, output_path: Optional[Path] = None) -> Path:
     if not dir_path.is_dir():
         raise NotADirectoryError(f"{dir_path} is not a directory")
 
-    # If no output path specified, create zip in parent dir with same name
-    if output_path is None:
-        output_path = dir_path.parent / f"{dir_path.name}.truffle"
+    # # If no output path specified, create zip in parent dir with same name
+    # if output_path is None:
+    #     output_path = dir_path.parent / f"{dir_path.name}.truffle"
 
-    # Ensure we don't overwrite existing files
-    if output_path.exists():
-        raise FileExistsError(f"Output path {output_path} already exists")
+    # # Ensure we don't overwrite existing files
+    # if output_path.exists():
+    #     raise FileExistsError(f"Output path {output_path} already exists")
 
-    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        # Walk through all files and directories in dir_path
-        for file_path in dir_path.rglob("*"):
-            if file_path.is_file():  # Skip directories, they're added implicitly
-                # Calculate relative path for the archive
-                rel_path = file_path.relative_to(dir_path)
-                # Prepend the directory name to create the correct structure
-                arcname = str(Path(dir_path.name) / rel_path)
-                zipf.write(file_path, arcname)
+    # with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+    #     # Walk through all files and directories in dir_path
+    #     for file_path in dir_path.rglob("*"):
+    #         if file_path.is_file():  # Skip directories, they're added implicitly
+    #             # Calculate relative path for the archive
+    #             rel_path = file_path.relative_to(dir_path)
+    #             # Prepend the directory name to create the correct structure
+    #             arcname = str(Path(dir_path.name) / rel_path)
+    #             zipf.write(file_path, arcname)
 
+    os.system(f"zip -r {dir_path}.truffle {dir_path}")
     return output_path
 
 
@@ -172,7 +174,7 @@ class {proj_name}:
             icon="icon.png",
         )
     
-    # All tool calls must start with a capital letter! 
+    # All tool calls must start with a capital letter! todo: fix this arbitrary restriction
     @truffle.tool(
         description="Replace this with a description of the tool.",
         icon="brain"
@@ -184,6 +186,9 @@ class {proj_name}:
         \"\"\"
         # There are 
         pass
+    @truffle.tool("Adds two numbers together", icon="plusminus.circle")
+    def Calculate(self, a: int, b: int) -> int:
+        return a + b
 
 if __name__ == "__main__":
     app = truffle.TruffleApp({proj_name}())
@@ -238,7 +243,7 @@ def init(
     )
     shutil.copy2(
         Path(__file__).parent / "cli_assets" / "default_app.png",
-        proj_path / "app_icon.png",
+        proj_path / "icon.png",
     )
 
 
@@ -351,14 +356,24 @@ def build(
     """
     Bundle a Truffle App project folder into a zip for distribution.
     """
+    if app_dir is None:
+        log.error("No app directory provided.")
+        sys.exit(1)
+    if app_dir == ".":
+        app_dir = Path.cwd()
+        log.warning(f"No app directory provided, using current directory '{os.path.abspath(app_dir)}'")
     app_dir = Path(app_dir)
-    # Validate the given app dir has a script
     if not app_dir.exists():
         log.error(f"Given path {app_dir} does not exist.")
+        sys.exit(1)
+    if not os.path.exists(app_dir / "main.py"):
+        log.error(f"No 'main.py' found @ {os.path.abspath(app_dir)}")
+        sys.exit(1)
+    # Validate the given app dir has a script
     elif not check_files or (
         _validate_main_py(app_dir / "main.py")
         and _validate_truffle_json(app_dir / "manifest.json")
-        # and _validate_requirements_txt(app_dir / "requirements.txt")
+        and _validate_requirements_txt(app_dir / "requirements.txt")
     ):
         _assemble_zip(app_dir.absolute())
 
@@ -408,7 +423,7 @@ def upload(
     ] = True,
 ) -> Response:
     """Push a built truffle app to the cloud"""
-    url = "https://overcast.itsalltruffles.com:2087"
+    url = TRUFFLE_CLOUD_URL
     user_id = (
         Path(
             f"/Users/{getpass.getuser()}/Library/Containers/com.deepshard.TruffleOS/Data/Library/Application Support/TruffleOS/magic-number.txt"
@@ -420,6 +435,8 @@ def upload(
         response = send_zip_file(url, zip_path, user_id)
         if response.status_code == 200:
             print(f"Upload of {zip_path.name} successful!")
+            print(f"Check your client for the status")
+            os.system("open 'truffle://focus'")
 
     except FileNotFoundError:
         print(f"Error: Could not find file {zip_path}")
