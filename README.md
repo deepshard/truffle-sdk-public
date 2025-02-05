@@ -3,6 +3,11 @@
 This repo provides the Truffle SDK and the Truffle CLI tool. Full Truffle SDK functionality is planned to be open-sourced at a later date.
 Issues associated with the SDK functionality should be filed here. Wheels should be fetched from releases.
 
+# Installation (warning, still in alpha)
+
+`pip install https://github.com/deepshard/truffle-sdk-public/releases/download/v0.6.5/truffle_sdk-0.6.4-py3-none-any.whl` - check releases for latest wheel
+
+
 # Creating a new app
 `truffle init MyCoolApp` (omit to use current directory)
 
