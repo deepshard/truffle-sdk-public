@@ -20,7 +20,7 @@ import urllib3
 from requests.models import Response
 from typing_extensions import Annotated
 from urllib3.exceptions import InsecureRequestWarning
-
+import uuid 
 __version__ = "0.6.5"
 
 log = logging.getLogger(__name__)
@@ -230,7 +230,9 @@ def init(
             typer.prompt(f"Enter example prompt {i + 1} of {num_examples}: ", type=str)
             for i in range(num_examples)
         ],
-        "manifest_version": 0,
+        "packages": [],
+        "manifest_version": 1,
+        "app_bundle_id" : str(uuid.uuid4()) # we can't just find your app by name, we need a unique identifier in case you change it! 
     }
     main_py_text = _generate_main_py(proj_name, truffle_manifest)
     # create the folder and its contents
