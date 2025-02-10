@@ -168,11 +168,7 @@ import truffle
 
 class {proj_name}:
     def __init__(self):
-        self.metadata = truffle.AppMetadata(
-            name="{proj_name}",
-            description="{truffle_manifest["description"]}",
-            icon="icon.png",
-        )
+        self.client = truffle.TruffleClient()
     
     # All tool calls must start with a capital letter! todo: fix this arbitrary restriction
     @truffle.tool(
